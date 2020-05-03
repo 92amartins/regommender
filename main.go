@@ -46,7 +46,7 @@ func setRecommendation(w http.ResponseWriter, r *http.Request) {
 func main() {
 	router := mux.NewRouter().StrictSlash(true)
 
-	router.HandleFunc("/", healthcheck)
+	router.HandleFunc("/", healthcheck).Methods("GET")
 	router.HandleFunc("/recommendations/{source_id}", getRecommendation).Methods("GET")
 	router.HandleFunc("/recommendation/", setRecommendation).Methods("POST")
 
