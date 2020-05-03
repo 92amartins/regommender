@@ -18,18 +18,27 @@ type recommendation struct {
 }
 
 var client = redis.NewClient(&redis.Options{
-	Addr:     "localhost:6379",
+	Addr:     "redis:6379",
 	Password: "",
 	DB:       0,
 })
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "This is reGommender. I'm up and running.")
+	fmt.Fprintf(w, "api: ok ")
+	_, err := client.Ping().Result()
+	if err != nil {
+		fmt.Fprintf(w, err.Error())
+	}
+	fmt.Fprintf(w, "redis: ok")
 }
 
 func getRecommendation(w http.ResponseWriter, r *http.Request) {
 	source := mux.Vars(r)["source_id"]
-	response, _ := client.ZRevRange(source, 0, 9).Result()
+	response, err := client.ZRevRange(source, 0, 9).Result()
+
+	if err != redis.Nil {
+		fmt.Print(err)
+	}
 	json.NewEncoder(w).Encode(response)
 }
 
