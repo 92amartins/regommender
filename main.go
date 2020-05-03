@@ -1,109 +1,58 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/go-redis/redis"
+
 	"github.com/gorilla/mux"
-	"encoding/json"
-	"io/ioutil"
 )
 
 type recommendation struct {
-	ID          string `json:"ID"`
-	Source		string `json:"Source"`
-	Target		string `json:"Target"`
-	Title       string `json:"Title"`
-	Description string `json:"Description"`
+	Source string  `json:"Source"`
+	Target string  `json:"Target"`
+	Score  float64 `json:"Score"`
 }
 
-type allRecommendations []recommendation
-
-var recs = allRecommendations{
-	{
-		ID:	"1",
-		Source:	"obama",
-		Target: "sapiens",
-		Title:	"Sapiens: A brief history of humankind.",
-		Description: "The book surveys the history of humankind from the evolution of archaic human species in the Stone Age up to the twenty-first century, focusing on Homo sapiens.",
-	},
+func healthcheck(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "This is reGommender. I'm up and running.")
 }
 
-func homeLink(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome home!")
+func getRecommendation(w http.ResponseWriter, r *http.Request) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+	source := mux.Vars(r)["source_id"]
+	response, _ := client.ZRevRange(source, 0, 9).Result()
+	json.NewEncoder(w).Encode(response)
 }
 
-func createRecommendation(w http.ResponseWriter, r *http.Request) {
-	var newRec recommendation
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "Could not create recommendation")
-	}
+func setRecommendation(w http.ResponseWriter, r *http.Request) {
+	var rec recommendation
 
-	json.Unmarshal(reqBody, &newRec)
-	recs = append(recs, newRec)
-	w.WriteHeader(http.StatusCreated)
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
 
-	json.NewEncoder(w).Encode(newRec)
-}
-
-func getOneRec(w http.ResponseWriter, r *http.Request) {
-	recID := mux.Vars(r)["id"]
-
-	for _, singleRec := range recs {
-		if singleRec.ID == recID {
-			json.NewEncoder(w).Encode(singleRec)
-		}
-	}
-}
-
-func getAllRecs(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(recs)
-}
-
-func updateRec(w http.ResponseWriter, r *http.Request) {
-	recID := mux.Vars(r)["id"]
-	var updatedRec recommendation
-
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "Kindly enter data with the recommendation data only in order to update")
-	}
-	json.Unmarshal(reqBody, &updatedRec)
-
-	for i, singleRec := range recs {
-		if singleRec.ID == recID {
-			singleRec.Source = updatedRec.Source
-			singleRec.Target = updatedRec.Target
-			singleRec.Title = updatedRec.Title
-			singleRec.Description = updatedRec.Description
-			recs = append(recs[:i], singleRec)
-			json.NewEncoder(w).Encode(singleRec)
-		}
-	}
-}
-
-func deleteRec(w http.ResponseWriter, r *http.Request) {
-	recID := mux.Vars(r)["id"]
-
-	for i, singleRec := range recs {
-		if singleRec.ID == recID {
-			recs = append(recs[:i], recs[i+1:]...)
-			fmt.Fprintf(w, "The recommendation %v has been deleted successfully", recID)
-		}
-	}
+	reqBody, _ := ioutil.ReadAll(r.Body)
+	json.Unmarshal(reqBody, &rec)
+	client.ZAdd(rec.Source, redis.Z{rec.Score, rec.Target})
 }
 
 func main() {
 	router := mux.NewRouter().StrictSlash(true)
 
-	router.HandleFunc("/", homeLink)
-	router.HandleFunc("/recommendation", createRecommendation).Methods("POST")
-	router.HandleFunc("/recommendations/{id}", getOneRec).Methods("GET")
-	router.HandleFunc("/recommendations/", getAllRecs).Methods("GET")
-	router.HandleFunc("/recommendations/{id}", updateRec).Methods("PATCH")
-	router.HandleFunc("/recommendations/{id}", deleteRec).Methods("DELETE")
+	router.HandleFunc("/", healthcheck)
+	router.HandleFunc("/recommendations/{source_id}", getRecommendation).Methods("GET")
+	router.HandleFunc("/recommendation/", setRecommendation).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
-
