@@ -37,7 +37,10 @@ func setRecommendation(w http.ResponseWriter, r *http.Request) {
 	var rec recommendation
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(reqBody, &rec)
-	client.ZAdd(rec.Source, redis.Z{rec.Score, rec.Target})
+	client.ZAdd(rec.Source, redis.Z{
+		Score:  rec.Score,
+		Member: rec.Target,
+	})
 }
 
 func main() {
