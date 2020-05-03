@@ -1,18 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+
 	"github.com/gorilla/mux"
-	"encoding/json"
-	"io/ioutil"
 )
 
 type recommendation struct {
 	ID          string `json:"ID"`
-	Source		string `json:"Source"`
-	Target		string `json:"Target"`
+	Source      string `json:"Source"`
+	Target      string `json:"Target"`
 	Title       string `json:"Title"`
 	Description string `json:"Description"`
 }
@@ -21,10 +22,10 @@ type allRecommendations []recommendation
 
 var recs = allRecommendations{
 	{
-		ID:	"1",
-		Source:	"obama",
-		Target: "sapiens",
-		Title:	"Sapiens: A brief history of humankind.",
+		ID:          "1",
+		Source:      "obama",
+		Target:      "sapiens",
+		Title:       "Sapiens: A brief history of humankind.",
 		Description: "The book surveys the history of humankind from the evolution of archaic human species in the Stone Age up to the twenty-first century, focusing on Homo sapiens.",
 	},
 }
@@ -61,28 +62,6 @@ func getAllRecs(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(recs)
 }
 
-func updateRec(w http.ResponseWriter, r *http.Request) {
-	recID := mux.Vars(r)["id"]
-	var updatedRec recommendation
-
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "Kindly enter data with the recommendation data only in order to update")
-	}
-	json.Unmarshal(reqBody, &updatedRec)
-
-	for i, singleRec := range recs {
-		if singleRec.ID == recID {
-			singleRec.Source = updatedRec.Source
-			singleRec.Target = updatedRec.Target
-			singleRec.Title = updatedRec.Title
-			singleRec.Description = updatedRec.Description
-			recs = append(recs[:i], singleRec)
-			json.NewEncoder(w).Encode(singleRec)
-		}
-	}
-}
-
 func deleteRec(w http.ResponseWriter, r *http.Request) {
 	recID := mux.Vars(r)["id"]
 
@@ -101,9 +80,7 @@ func main() {
 	router.HandleFunc("/recommendation", createRecommendation).Methods("POST")
 	router.HandleFunc("/recommendations/{id}", getOneRec).Methods("GET")
 	router.HandleFunc("/recommendations/", getAllRecs).Methods("GET")
-	router.HandleFunc("/recommendations/{id}", updateRec).Methods("PATCH")
 	router.HandleFunc("/recommendations/{id}", deleteRec).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
-
